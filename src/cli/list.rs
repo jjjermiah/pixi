@@ -40,11 +40,11 @@ pub struct Args {
     pub platform: Option<Platform>,
 
     /// Whether to output in json format
-    #[arg(long)]
+    #[arg(short = 'j', long)]
     pub json: bool,
 
     /// Whether to output in pretty json format
-    #[arg(long)]
+    #[arg(long, short = 'p')]
     pub json_pretty: bool,
 
     /// Sorting strategy
