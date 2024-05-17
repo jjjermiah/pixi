@@ -180,6 +180,21 @@ impl<'p> Environment<'p> {
             .map(ToOwned::to_owned)
             .collect()
     }
+
+    /// Returns the Task::Execute information for all tasks
+    /// return a Vec of Task::Execute information
+    pub fn get_all_task_info(&self) -> Vec<Task> {
+        self.tasks(Some(Platform::current()))
+            .into_iter()
+            .flat_map(|tasks|{ 
+                tasks.into_iter().filter_map(|(_, value)| {
+                    Some(value)
+                })
+            })
+            .map(ToOwned::to_owned)
+            .collect::<Vec<Task>>()
+    }
+
     /// Returns the task with the given `name` and for the specified `platform` or an `UnknownTask`
     /// which explains why the task was not available.
     pub fn task(

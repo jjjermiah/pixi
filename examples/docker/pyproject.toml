@@ -46,7 +46,14 @@ build-wheel = "python -m build --no-isolation --wheel ."
 
 [tool.pixi.feature.prod.tasks]
 # Install into the production environment
-postinstall-production = "pip install --no-deps --disable-pip-version-check dist/docker_project-*.whl"
+build-prod = "python -m build --no-isolation --wheel ."
+postinstall-production = { cmd = "pip install --no-deps --disable-pip-version-check dist/docker_project-*.whl", inputs = [
+    "src",
+], outputs = [
+    "dist/docker_project-*.whl"
+], depends-on = [
+    "build-prod"
+] }
 
 [tool.pixi.tasks]
 dev = "flask --app docker_project:app run"

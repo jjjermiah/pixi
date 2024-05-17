@@ -119,7 +119,7 @@ impl Task {
             Task::Alias(_) => None,
         }
     }
-
+    
     /// Returns the command to execute as a single string.
     pub fn as_single_command(&self) -> Option<Cow<str>> {
         match self {
@@ -154,6 +154,48 @@ impl Task {
     pub fn is_custom(&self) -> bool {
         matches!(self, Task::Custom(_))
     }
+
+    // Returns a detailed string representation of the task.
+    // Importantly, the cmd, inputs, outputs, depends_on, cwd, and env fields are displayed.
+    pub fn detailed_display(&self) -> String {
+        match self {
+            Task::Plain(cmd) => cmd.clone(),
+            Task::Execute(execute) => {
+                let mut out = execute.cmd.as_single().into_owned();
+                if let Some(inputs) = &execute.inputs {
+                    out.push_str(&format!(", inputs = {:?}", inputs));
+                }
+                if let Some(outputs) = &execute.outputs {
+                    out.push_str(&format!(", outputs = {:?}", outputs));
+                }
+                if !execute.depends_on.is_empty() {
+                    out.push_str(&format!(", depends-on = {:?}", execute.depends_on));
+                }
+                if let Some(cwd) = &execute.cwd {
+                    out.push_str(&format!(", cwd = {:?}", cwd));
+                }
+                if let Some(env) = &execute.env {
+                    out.push_str(&format!(", env = {:?}", env));
+                }
+                out
+            }
+            Task::Alias(alias) => {
+                let mut out = String::new();
+                if !alias.depends_on.is_empty() {
+                    out.push_str(&format!(", depends-on = {:?}", alias.depends_on));
+                }
+                out
+            }
+            Task::Custom(custom) => {
+                let mut out = custom.cmd.as_single().into_owned();
+                if let Some(cwd) = &custom.cwd {
+                    out.push_str(&format!(", cwd = {:?}", cwd));
+                }
+                out
+            }
+        }
+    }   
+
 }
 
 /// A command script executes a single command from the environment

@@ -293,6 +293,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .ok_or_else(|| miette::miette!("unknown environment '{n}'"))
                 })
                 .transpose()?;
+
             let available_tasks: HashSet<TaskName> =
                 if let Some(explicit_environment) = explicit_environment {
                     explicit_environment.get_filtered_tasks()
@@ -303,7 +304,13 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .filter(|env| {
                             verify_current_platform_has_required_virtual_packages(env).is_ok()
                         })
-                        .flat_map(|env| env.get_filtered_tasks())
+                        .flat_map(|env| {
+                            let mut _tasks: Vec<Task> = env.get_all_task_info();
+                            _tasks.iter().for_each(|task| {
+                                println!("{:?}", task.detailed_display());
+                            });
+                            env.get_filtered_tasks()
+                        })
                         .collect()
                 };
 
