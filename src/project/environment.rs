@@ -163,6 +163,46 @@ impl<'p> Environment<'p> {
         Ok(result)
     }
 
+    /// For a given environment, return a HashMap<FeatureName, HashSet<TaskName>> of all tasks
+    /// available for the given environment.
+    /// This will not return task prefixed with _
+    pub fn get_filtered_tasks_by_feature(
+        &self,
+    ) -> HashMap<EnvironmentName, HashMap<FeatureName, HashMap<TaskName, String>>> {
+        let ft = self.features().map(|feature| {
+            // deserialize the feature
+            let tasks: HashMap<TaskName, String> = feature
+                .targets
+                .resolve(None)
+                .flat_map(|target| target.tasks.iter())
+                .map(|(task_name, task)| (task_name.clone(), task.as_task_description_combo().1))
+                .collect();
+
+            // filter out tasks that start with _
+            let filtered_tasks: HashMap<TaskName, String> = tasks
+                .into_iter()
+                .filter(|(key, _)| !key.as_str().starts_with('_'))
+                .collect();
+
+            // return the feature name and the filtered tasks
+            (feature.name.clone(), filtered_tasks)
+        });
+
+        // convert the iterator to a HashMap
+        let mut ft_map: HashMap<FeatureName, HashMap<TaskName, String>> = HashMap::new();
+        for (feature_name, tasks) in ft {
+            let task_names: HashMap<TaskName, String> = tasks.into_iter().collect();
+            ft_map.insert(feature_name, task_names);
+        }
+
+        // return a hashmap of output type
+        let mut output: HashMap<EnvironmentName, HashMap<FeatureName, HashMap<TaskName, String>>> =
+            HashMap::new();
+
+        output.insert(self.name().clone(), ft_map);
+        output
+    }
+
     /// Return all tasks available for the given environment
     /// This will not return task prefixed with _
     pub fn get_filtered_tasks(&self) -> HashSet<TaskName> {

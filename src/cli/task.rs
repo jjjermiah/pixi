@@ -7,7 +7,7 @@ use clap::Parser;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -71,6 +71,10 @@ pub struct AddArgs {
     #[arg(long, short)]
     pub feature: Option<String>,
 
+    /// A description of the task
+    #[arg(long)]
+    pub description: Option<String>,
+
     /// The working directory relative to the root of the project
     #[arg(long)]
     pub cwd: Option<PathBuf>,
@@ -109,6 +113,9 @@ pub struct AliasArgs {
 pub struct ListArgs {
     #[arg(long, short)]
     pub summary: bool,
+
+    #[arg(long, short)]
+    pub detailed: bool,
 
     /// The environment the list should be generated for
     /// If not specified, the default environment is used.
@@ -152,6 +159,7 @@ impl From<AddArgs> for Task {
             Self::Execute(Execute {
                 cmd: CmdArgs::Single(cmd_args),
                 depends_on,
+                description: None,
                 inputs: None,
                 outputs: None,
                 cwd,
@@ -293,9 +301,44 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .ok_or_else(|| miette::miette!("unknown environment '{n}'"))
                 })
                 .transpose()?;
-            let available_tasks: HashSet<TaskName> =
-                if let Some(explicit_environment) = explicit_environment {
-                    explicit_environment.get_filtered_tasks()
+            if !args.detailed {
+                let available_tasks: HashSet<TaskName> =
+                    if let Some(explicit_environment) = explicit_environment {
+                        explicit_environment.get_filtered_tasks()
+                    } else {
+                        project
+                            .environments()
+                            .into_iter()
+                            .filter(|env| {
+                                verify_current_platform_has_required_virtual_packages(env).is_ok()
+                            })
+                            .flat_map(|env| env.get_filtered_tasks())
+                            .collect()
+                    };
+                if available_tasks.is_empty() {
+                    eprintln!("No tasks found",);
+                } else {
+                    let formatted: String = available_tasks
+                        .iter()
+                        .sorted()
+                        .map(|name| {
+                            if args.summary {
+                                format!("{} ", name.as_str(),)
+                            } else {
+                                format!("* {}\n", name.fancy_display().bold(),)
+                            }
+                        })
+                        .collect();
+
+                    println!("{}", formatted);
+                }
+            } else {
+                //Refactor from HashMap<EnvironmentName, HashSet<TaskName>> to HashMap<EnvironmentName, HashMap<FeatureName, HashSet<TaskName>>>
+                let available_tasks: HashMap<
+                    EnvironmentName,
+                    HashMap<FeatureName, HashMap<TaskName, String>>,
+                > = if let Some(explicit_environment) = explicit_environment {
+                    explicit_environment.get_filtered_tasks_by_feature()
                 } else {
                     project
                         .environments()
@@ -303,26 +346,80 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .filter(|env| {
                             verify_current_platform_has_required_virtual_packages(env).is_ok()
                         })
-                        .flat_map(|env| env.get_filtered_tasks())
-                        .collect()
+                        .map(|env| env.get_filtered_tasks_by_feature())
+                        .fold(
+                            HashMap::new(),
+                            |mut acc: HashMap<
+                                EnvironmentName,
+                                HashMap<FeatureName, HashMap<TaskName, String>>,
+                            >,
+                             tasks| {
+                                for (env, features) in tasks {
+                                    for (feature, tasks) in features {
+                                        let entry = acc
+                                            .entry(env.clone())
+                                            .or_insert_with(HashMap::new)
+                                            .entry(feature.clone())
+                                            .or_insert_with(HashMap::new);
+                                        for (task, description) in tasks {
+                                            entry.insert(task, description);
+                                        }
+                                    }
+                                }
+                                acc
+                            },
+                        )
                 };
 
-            if available_tasks.is_empty() {
-                eprintln!("No tasks found",);
-            } else {
-                let formatted: String = available_tasks
-                    .iter()
-                    .sorted()
-                    .map(|name| {
-                        if args.summary {
-                            format!("{} ", name.as_str(),)
-                        } else {
-                            format!("* {}\n", name.fancy_display().bold(),)
-                        }
-                    })
-                    .collect();
+                if available_tasks.is_empty() {
+                    eprintln!("No tasks found",);
+                } else {
+                    // do the tree for each env, but for the last env, the last feature should have a "╚═" instead of "╠═"
+                    let formatted = available_tasks
+                        .iter()
+                        .sorted_by_key(|(env, _)| env.clone())
+                        .map(|(env, features)| {
+                            let mut formatted = format!(
+                                "{}\n",
+                                console::style(env.fancy_display().bold()).magenta()
+                            );
+                            for (feature, tasks) in features {
+                                // if env is publish and feature is the last one, use "╚═" instead of "╠═"
+                                let mut ft_prefix: &str = "╠═";
+                                let mut task_prefix: &str = "║";
+                                if env.as_str() == "publish"
+                                    && (features.len() == 1
+                                        || feature == features.keys().last().unwrap())
+                                {
+                                    ft_prefix = "╚═";
+                                    task_prefix = " ";
+                                }
+                                formatted.push_str(&format!(
+                                    "{} {}\n",
+                                    ft_prefix,
+                                    console::style(feature.fancy_display().bold()).yellow()
+                                ));
+                                for (i, (task, description)) in tasks.iter().enumerate() {
+                                    let prefix = if i == tasks.len() - 1 {
+                                        "╚═"
+                                    } else {
+                                        "╠═"
+                                    };
+                                    formatted.push_str(&format!(
+                                        "{}   {} {:<20} {}\n",
+                                        task_prefix,
+                                        prefix,
+                                        task.fancy_display().bold(),
+                                        console::style(description).green()
+                                    ));
+                                }
+                            }
+                            formatted
+                        })
+                        .collect::<String>();
 
-                println!("{}", formatted);
+                    println!("{}", formatted);
+                }
             }
         }
     };

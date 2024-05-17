@@ -1,0 +1,130 @@
+#--------------------------------------------------------------------------------------------------#
+######################################### Package Config ###########################################
+#__________________________________________________________________________________________________#
+[project]
+name = "testmypixipkg"
+version = "0.17.0"
+description = "Add a short description here"
+license = "MIT"
+readme = "README.md"
+keywords = ["testmypixipkg", "pixi", "python", "package", "template"]
+authors = [{ name = "Jermiah Joseph", email = "jermiahjoseph98@gmail.com" }]
+maintainers = [{ name = "Jermiah Joseph", email = "jermiahjoseph98@gmail.com" }]
+
+requires-python = ">= 3.11"
+dependencies = ["rich", "rich-click"]
+
+[project.urls]
+homepage = "https://github.com/jjjermiah/pypackage"
+repository = "https://github.com/jjjermiah/pypackage"
+documentation = "https://jjjermiah.github.io/pypackage/"
+changelog = "https://github.com/jjjermiah/pypackage/blob/main/CHANGELOG.md"
+issues = "https://github.com/jjjermiah/pypackage/issues"
+
+[project.scripts]
+pypkg = "testmypixipkg.__main__:say_hello"
+test_func = "testmypixipkg.cli:test_func"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+#--------------------------------------------------------------------------------------------------#
+############################################## PIXI ################################################
+#__________________________________________________________________________________________________#
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64", "osx-64"]
+
+[tool.pixi.pypi-dependencies]
+testmypixipkg = { path = ".", editable = true }
+
+[tool.pixi.environments]
+dev = { features = ["test", "style", "docs"], solve-group = "default" }
+publish = { features = ["build", "release"], solve-group = "default" }
+
+[tool.pixi.tasks]
+pkg-hello = { cmd = 'echo "Hello World!"', description = "Prints Hello World! from the package script" }
+############################################## TEST ################################################
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-xdist = "*"
+
+[tool.pixi.feature.test.tasks.test]
+cmd = [
+  "pytest",
+  "--numprocesses=auto",
+  "-s",
+  "--verbose",
+  "--cov=testmypixipkg",
+  "--cov-report=xml:coverage-report/coverage.xml",
+]
+inputs = ["src", "tests"]
+outputs = ["coverage-report/coverage.xml"]
+description = "Run the test suite"
+
+############################################## STYLE ###############################################
+# See ruff.toml for the configuration
+[tool.pixi.feature.style.dependencies]
+ruff = "*"
+
+[tool.pixi.feature.style.tasks]
+style = { cmd = "ruff check src", inputs = [
+  "src",
+], description = "Check the style of the code" }
+
+############################################## DOCS ################################################
+# Available tasks: doc-build, doc-serve, doc-deploy
+
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "*"
+
+[tool.pixi.feature.docs.tasks.doc-build]
+cmd = "mkdocs build -f mkdocs.yaml"
+inputs = ["docs"]
+outputs = ["site"]
+description = "Build the documentation"
+
+[tool.pixi.feature.docs.tasks.doc-serve]
+cmd = "mkdocs serve -f mkdocs.yaml"
+inputs = ["docs"]
+description = "Serve the documentation locally"
+
+[tool.pixi.feature.docs.tasks.doc-deploy]
+cmd = "mkdocs gh-deploy -f mkdocs.yaml --force"
+inputs = ["docs"]
+description = "Deploy the documentation to GitHub Pages"
+#################################### RELEASE & BUILD ###############################################
+[tool.pixi.feature.release.dependencies]
+python-semantic-release = ">=8.5.1"
+
+[tool.pixi.feature.release.tasks]
+# Semver task will only work on the main or dev/develop branch (see releaserc.toml:branches)
+semver = { cmd = 'echo "Next Version is: $(semantic-release -c releaserc.toml version --print)"', description = "Prints the next version" }
+release = { cmd = "semantic-release -c releaserc.toml  version --print", description = "Releases the package on GitHub" }
+
+[tool.pixi.feature.build.dependencies]
+hatch = "*"
+
+[tool.pixi.feature.build.tasks]
+# Builds the package and publishes it to the test.pypi.org repository
+build = { cmd = "hatch build --clean", inputs = [
+  "src",
+], outputs = [
+  "dist/*",
+], description = "Build the package" }
+
+publish-pypi = { cmd = "hatch publish --yes --repo main", inputs = [
+  "dist/*",
+  "hatch.toml",
+], depends-on = [
+  "build",
+], description = "Publish the package to PyPI" }
+
+publish-test = { cmd = "hatch publish --yes --repo test", inputs = [
+  "dist/*",
+  "hatch.toml",
+], depends-on = [
+  "build",
+], description = "Publish the package to TestPyPI" }
