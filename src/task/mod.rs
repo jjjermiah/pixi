@@ -26,6 +26,8 @@ pub use task_environment::{
 };
 pub use task_graph::{TaskGraph, TaskGraphError, TaskId, TaskNode};
 
+use crate::cli::project::description;
+
 /// Represents a task name
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct TaskName(String);
@@ -66,6 +68,20 @@ pub enum Task {
     // given in the command line.
     #[serde(skip)]
     Custom(Custom),
+}
+
+#[derive(Serialize)]
+pub struct TaskToOutput {
+    description: String,
+    command: String,
+    depends_on: Vec<String>,
+    env: Option<IndexMap<String, String>>,
+    cwd: Option<PathBuf>,
+    inputs: Option<Vec<String>>,
+    outputs: Option<Vec<String>>,
+    platform: Option<String>,
+    kind: String,
+    is_custom: bool,
 }
 
 impl Task {
@@ -175,6 +191,75 @@ impl Task {
             ),
         }
     }
+
+    pub fn name(&self) -> TaskName {
+        match self {
+            Task::Plain(_) => TaskName("".to_string()),
+            Task::Custom(custom) => TaskName(custom.cmd.as_single().into_owned()),
+            Task::Execute(execute) => TaskName(execute.cmd.as_single().into_owned()),
+            Task::Alias(alias) => TaskName(alias.depends_on.iter().map(|t| t.as_str()).join(",")),
+        }
+    }
+
+    pub fn create_task_to_output(&self) -> TaskToOutput {
+        let description = match self {
+            Task::Execute(execute) => execute
+                .description
+                .clone()
+                .unwrap_or_else(|| "".to_string()),
+            _ => "".to_string(),
+        };
+        let command = self
+            .as_single_command()
+            .unwrap_or(Cow::Borrowed(""))
+            .to_string();
+        let depends_on = self
+            .depends_on()
+            .iter()
+            .map(|t| t.as_str())
+            .map(|t| t.to_string())
+            .collect();
+        let env = self.env().map(|e| e.clone());
+        let cwd: Option<PathBuf> = self.working_directory().map(|p| p.to_path_buf());
+        let inputs = match self {
+            Task::Execute(execute) => execute.inputs.clone(),
+            _ => None,
+        };
+        let outputs = match self {
+            Task::Execute(execute) => execute.outputs.clone(),
+            _ => None,
+        };
+        let platform = None;
+        let kind = match self {
+            Task::Plain(_) => "Plain",
+            Task::Custom(_) => "Custom",
+            Task::Execute(_) => "Execute",
+            Task::Alias(_) => "Alias",
+        };
+        let is_custom = self.is_custom();
+        TaskToOutput {
+            description,
+            command,
+            depends_on,
+            env,
+            cwd,
+            inputs,
+            outputs,
+            platform,
+            kind: kind.to_string(),
+            is_custom,
+        }
+    }
+}
+pub fn json_tasks(tasks: &Vec<TaskToOutput>, json_pretty: bool) {
+    let json_string = if json_pretty {
+        serde_json::to_string_pretty(&tasks)
+    } else {
+        serde_json::to_string(&tasks)
+    }
+    .expect("Cannot serialize tasks to JSON");
+
+    println!("{}", json_string);
 }
 
 /// A command script executes a single command from the environment

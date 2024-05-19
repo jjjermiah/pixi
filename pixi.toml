@@ -56,7 +56,7 @@ mike-serve = "mike serve"
 [feature.schema.tasks]
 generate-schema = { cmd = "python model.py > schema.json", cwd = "schema" }
 # Using deprecated `depends_on` to avoid conflicts in ci. Changes after release.
-test-schema = { cmd = "pytest -s", depends_on = "generate-schema", cwd = "schema" }
+test-schema = { cmd = "pytest -s", depends_on = "generate-schema", cwd = "schema", description = "Run the schema tests" }
 toml-lint = "taplo lint --verbose **/pixi.toml"
 toml-format = "taplo fmt **/pixi.toml"
 

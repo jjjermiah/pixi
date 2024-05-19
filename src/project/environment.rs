@@ -6,7 +6,7 @@ use super::{
 use crate::project::has_features::HasFeatures;
 
 use crate::consts;
-use crate::task::TaskName;
+use crate::task::{TaskName, TaskToOutput};
 use crate::{task::Task, Project};
 use itertools::Either;
 use rattler_conda_types::{Arch, Platform};
@@ -220,6 +220,22 @@ impl<'p> Environment<'p> {
             .map(ToOwned::to_owned)
             .collect()
     }
+
+    /// Get the TaskToOutput map for the given environment
+    pub fn get_task_to_output_map(&self) -> HashMap<TaskName, TaskToOutput> {
+        // return a HashSet of TaskToOutput
+        let task_outputs: HashMap<TaskName, TaskToOutput> = self
+            .features()
+            .flat_map(|feature| feature.targets.resolve(None))
+            .flat_map(|target| target.tasks.iter())
+            .map(|(task_name, task)| {
+                let task_to_output = task.create_task_to_output();
+                (task_name.clone(), task_to_output)
+            })
+            .collect();
+        task_outputs
+    }
+
     /// Returns the task with the given `name` and for the specified `platform` or an `UnknownTask`
     /// which explains why the task was not available.
     pub fn task(

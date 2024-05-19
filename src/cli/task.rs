@@ -121,6 +121,11 @@ pub struct ListArgs {
     /// If not specified, the default environment is used.
     #[arg(long, short)]
     pub environment: Option<String>,
+
+    /// List as json instead of a tree
+    /// If not specified, the default environment is used.
+    #[arg(long, short)]
+    pub json: bool,
 }
 
 impl From<AddArgs> for Task {
@@ -301,6 +306,31 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .ok_or_else(|| miette::miette!("unknown environment '{n}'"))
                 })
                 .transpose()?;
+
+            if args.json {
+                let available_tasks: HashMap<TaskName, crate::task::TaskToOutput> =
+                    if let Some(explicit_environment) = explicit_environment {
+                        explicit_environment.get_task_to_output_map()
+                    } else {
+                        project
+                            .environments()
+                            .into_iter()
+                            .filter(|env| {
+                                verify_current_platform_has_required_virtual_packages(env).is_ok()
+                            })
+                            .flat_map(|env| env.get_task_to_output_map())
+                            .collect()
+                    };
+
+                // print using serde_json::to_string_pretty for each name
+                for (name, task) in available_tasks {
+                    let json_string = serde_json::to_string_pretty(&task)
+                        .expect("Cannot serialize tasks to JSON");
+                    println!("{}: {}", name.fancy_display().bold(), json_string);
+                }
+                return Ok(());
+            }
+
             if !args.detailed {
                 let available_tasks: HashSet<TaskName> =
                     if let Some(explicit_environment) = explicit_environment {
