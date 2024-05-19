@@ -385,13 +385,13 @@ pub fn execute(args: Args) -> miette::Result<()> {
                             );
                             for (feature, tasks) in features {
                                 // if env is publish and feature is the last one, use "╚═" instead of "╠═"
-                                let mut ft_prefix: &str = "╠═";
-                                let mut task_prefix: &str = "║";
+                                let mut ft_prefix: &str = "├──";
+                                let mut task_prefix: &str = "│";
                                 if env.as_str() == "publish"
                                     && (features.len() == 1
                                         || feature == features.keys().last().unwrap())
                                 {
-                                    ft_prefix = "╚═";
+                                    ft_prefix = "└──";
                                     task_prefix = " ";
                                 }
                                 formatted.push_str(&format!(
@@ -401,16 +401,16 @@ pub fn execute(args: Args) -> miette::Result<()> {
                                 ));
                                 for (i, (task, description)) in tasks.iter().enumerate() {
                                     let prefix = if i == tasks.len() - 1 {
-                                        "╚═"
+                                        "└──"
                                     } else {
-                                        "╠═"
+                                        "├──"
                                     };
                                     formatted.push_str(&format!(
-                                        "{}   {} {:<20} {}\n",
+                                        "{}   {} {:·<15} {}\n",
                                         task_prefix,
                                         prefix,
                                         task.fancy_display().bold(),
-                                        console::style(description).green()
+                                        console::style(description).yellow()
                                     ));
                                 }
                             }
