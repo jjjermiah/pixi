@@ -44,7 +44,9 @@ pub struct Args {
     pub json: bool,
 
     /// Whether to output in pretty json format
-    #[arg(long, short = 'p')]
+    /// To use the alias 'jp' use the following command:
+    /// cargo run -- list -jp
+    #[arg(long, short = 'p', alias = "jp")]
     pub json_pretty: bool,
 
     /// Sorting strategy
