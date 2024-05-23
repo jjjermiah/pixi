@@ -1,0 +1,141 @@
+#--------------------------------------------------------------------------------------------------#
+######################################### Package Config ###########################################
+#__________________________________________________________________________________________________#
+[project]
+name = "testmypixipkg"
+version = "0.19.0"
+description = "Add a short description here"
+license = "MIT"
+
+requires-python = ">= 3.11"
+dependencies = ["rich", "rich-click", "numpy"]
+
+[project.scripts]
+pypkg = "testmypixipkg.__main__:say_hello"
+test_func = "testmypixipkg.cli:test_func"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+#--------------------------------------------------------------------------------------------------#
+############################################## PIXI ################################################
+#__________________________________________________________________________________________________#
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64", "osx-64"]
+
+[tool.pixi.dependencies]
+
+[tool.pixi.pypi-dependencies]
+pydicomsorter = { path = ".", editable = true }
+
+[tool.pixi.environments]
+dev = { features = ["test", "style", "docs"], solve-group = "default" }
+publish = { features = ["build", "release"], solve-group = "default" }
+
+[tool.pixi.tasks]
+hello = {cmd = "echo 'Hello, World!'", description = "Prints 'Hello, World!'"}
+############################################## TEST ################################################
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-xdist = "*"
+ipykernel = ">=6.29.3,<6.30"
+
+[tool.pixi.feature.test.tasks.test]
+cmd = [
+  "pytest",
+  "--numprocesses=auto",
+  "-s",
+  "--verbose",
+  "--cov=pydicomsorter",
+  "--cov-report=xml:coverage-report/coverage.xml",
+  "--cov-config=config/coverage.toml",
+]
+inputs = ["src", "tests", "config/coverage.toml"]
+outputs = ["coverage-report/coverage.xml"]
+description = "Run the test suite"
+
+[tool.pixi.feature.test.tasks.coverage]
+cmd = "coverage report --rcfile=config/coverage.toml"
+inputs = ["coverage-report/coverage.xml", "config/coverage.toml"]
+depends-on = ["test"]
+description = "Generate the coverage report"
+
+[tool.pixi.feature.test.tasks.validate]
+cmd = "pre-commit run --all-files"
+inputs = ["src/*", "tests/*", "config/*"]
+description = "Run all pre-commit hooks, including test, lint, and format"
+
+############################################## STYLE ###############################################
+# See config/ruff.toml for the configuration
+[tool.pixi.feature.style.dependencies]
+ruff = ">=0.4.4"
+pre-commit = ">=3.7.1,<3.8"
+
+[tool.pixi.feature.style.tasks.lint]
+cmd = "ruff check --config=config/ruff.toml src"
+inputs = ["src", "config/ruff.toml"]
+description = "Run the ruff linter"
+
+[tool.pixi.feature.style.tasks.format]
+cmd = "ruff format --config=config/ruff.toml src"
+inputs = ["src", "config/ruff.toml"]
+description = "Run the ruff formatter"
+
+############################################## DOCS ################################################
+# Available tasks: doc-build, doc-serve, doc-deploy
+# See config/mkdocs.yaml for the configuration
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "*"
+
+[tool.pixi.feature.docs.tasks.doc-build]
+cmd = "mkdocs build -f config/mkdocs.yaml"
+inputs = ["docs"]
+outputs = ["site"]
+description = "Build the documentation"
+
+[tool.pixi.feature.docs.tasks.doc-serve]
+cmd = "mkdocs serve -f config/mkdocs.yaml"
+inputs = ["docs"]
+description = "Serve the documentation locally"
+
+[tool.pixi.feature.docs.tasks.doc-deploy]
+cmd = "mkdocs gh-deploy -f config/mkdocs.yaml --force"
+inputs = ["docs"]
+description = "Deploy the documentation to GitHub Pages"
+
+#################################### RELEASE & BUILD ###############################################
+[tool.pixi.feature.release.dependencies]
+python-semantic-release = ">=8.5.1"
+
+[tool.pixi.feature.release.tasks]
+# Semver task will only work on the main or dev/develop branch (see releaserc.toml:branches)
+semver = { cmd = 'echo "Next Version is: $(semantic-release -c config/releaserc.toml version --print)"', description = "Print the next version" }
+release = { cmd = "semantic-release -c config/releaserc.toml version", description = "Bump the version and create a new release" }
+
+[tool.pixi.feature.build.dependencies]
+hatch = "*"
+
+[tool.pixi.feature.build.tasks]
+build = { cmd = "hatch build --clean", inputs = [
+  "src",
+  "config/hatch.toml",
+], outputs = [
+  "dist/*",
+], env = { HATCH_CONFIG = "config/hatch.toml" }, description = "Build the package" }
+
+# Builds the package and publishes it to the test.pypi.org repository
+publish-pypi = { cmd = "hatch publish --yes --repo main", inputs = [
+  "dist/*",
+  "config/hatch.toml",
+], depends-on = [
+  "build",
+], env = { HATCH_CONFIG = "config/hatch.toml" }, description = "Publish the package to PyPI" }
+
+publish-test = { cmd = "hatch publish --yes --repo test", inputs = [
+  "dist/*",
+  "config/hatch.toml",
+], depends-on = [
+  "build",
+], env = { HATCH_CONFIG = "config/hatch.toml" }, description = "Publish the package to TestPyPI" }

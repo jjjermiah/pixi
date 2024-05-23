@@ -385,14 +385,17 @@ pub fn execute(args: Args) -> miette::Result<()> {
                             );
                             for (feature, tasks) in features {
                                 // if env is publish and feature is the last one, use "╚═" instead of "╠═"
-                                let mut ft_prefix: &str = "╠═";
-                                let mut task_prefix: &str = "║";
+                                let mut ft_prefix: &str = "├──";
+                                let mut task_prefix: &str = "│";
                                 if env.as_str() == "publish"
                                     && (features.len() == 1
                                         || feature == features.keys().last().unwrap())
                                 {
-                                    ft_prefix = "╚═";
+                                    ft_prefix = "└──";
                                     task_prefix = " ";
+                                }
+                                if tasks.is_empty() || (env != "default" && feature == &FeatureName::Default) {
+                                    continue;
                                 }
                                 formatted.push_str(&format!(
                                     "{} {}\n",
@@ -401,23 +404,34 @@ pub fn execute(args: Args) -> miette::Result<()> {
                                 ));
                                 for (i, (task, description)) in tasks.iter().enumerate() {
                                     let prefix = if i == tasks.len() - 1 {
-                                        "╚═"
+                                        "└────"
                                     } else {
-                                        "╠═"
+                                        "├────"
                                     };
                                     formatted.push_str(&format!(
-                                        "{}   {} {:<20} {}\n",
+                                        "{}   {} {:.<15} {}\n",
                                         task_prefix,
                                         prefix,
                                         task.fancy_display().bold(),
-                                        console::style(description).green()
+                                        console::style(description).yellow()
                                     ));
                                 }
                             }
                             formatted
                         })
                         .collect::<String>();
-
+                    // the header will be a row explaining "Environment > Feature > Task" in the correct colors
+                    println!(
+                        "{} {:<5} {:.<15} {}",
+                        console::style("Env").bold().magenta(),
+                        console::style("Feat").bold().cyan(),
+                        console::style("Task").bold().blue(),
+                        console::style("Description").yellow()
+                    );
+                    // print a row of "──" to separate the header from the content
+                    let console_width = console::Term::stdout().size().1 as usize;
+                    let separator = format!("{:─<width$}", "", width = console_width);
+                    println!("{}", separator);
                     println!("{}", formatted);
                 }
             }
