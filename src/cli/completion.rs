@@ -1,12 +1,20 @@
-use crate::cli::{Args, CompletionCommand};
-use clap::CommandFactory;
+use crate::cli::Args as CommandArgs;
+use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use regex::Regex;
 use std::borrow::Cow;
 use std::io::Write;
 
+/// Generates a completion script for a shell.
+#[derive(Parser, Debug)]
+pub struct Args {
+    /// The shell to generate a completion script for (defaults to 'bash').
+    #[arg(short, long)]
+    shell: Option<clap_complete::Shell>,
+}
+
 /// Generate completions for the pixi cli, and print those to the stdout
-pub(crate) fn execute(args: CompletionCommand) -> miette::Result<()> {
+pub(crate) fn execute(args: Args) -> miette::Result<()> {
     let clap_shell = args
         .shell
         .or(clap_complete::Shell::from_env())
@@ -33,7 +41,7 @@ pub(crate) fn execute(args: CompletionCommand) -> miette::Result<()> {
 /// Generate the completion script using clap_complete for a specified shell.
 fn get_completion_script(shell: clap_complete::Shell) -> String {
     let mut buf = vec![];
-    clap_complete::generate(shell, &mut Args::command(), "pixi", &mut buf);
+    clap_complete::generate(shell, &mut CommandArgs::command(), "pixi", &mut buf);
     String::from_utf8(buf).expect("clap_complete did not generate a valid UTF8 script")
 }
 
@@ -48,7 +56,7 @@ fn replace_bash_completion(script: &str) -> Cow<str> {
                COMPREPLY=( $$(compgen -W "$${opts}" -- "$${cur}") )
                return 0
             elif [[ $${COMP_CWORD} -eq 2 ]]; then
-               local tasks=$$(pixi task list --summary 2> /dev/null)
+               local tasks=$$(pixi task list --machine-readable 2> /dev/null)
                if [[ $$? -eq 0 ]]; then
                    COMPREPLY=( $$(compgen -W "$${tasks}" -- "$${cur}") )
                    return 0
@@ -65,7 +73,7 @@ fn replace_zsh_completion(script: &str) -> Cow<str> {
     // NOTE THIS IS FORMATTED BY HAND
     let zsh_replacement = r#"$1
 local tasks
-tasks=("$${(@s/ /)$$(pixi task list --summary 2> /dev/null)}")
+tasks=("$${(@s/ /)$$(pixi task list --machine-readable 2> /dev/null)}")
 
 if [[ -n "$$tasks" ]]; then
     _values 'task' "$${tasks[@]}"

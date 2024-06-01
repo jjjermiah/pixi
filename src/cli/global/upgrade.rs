@@ -10,12 +10,11 @@ use miette::{IntoDiagnostic, Report};
 use rattler_conda_types::{Channel, MatchSpec, PackageName, Platform};
 use tokio::task::JoinSet;
 
+use crate::cli::has_specs::HasSpecs;
 use crate::config::Config;
 use crate::progress::{global_multi_progress, long_running_progress_style};
 
-use super::common::{
-    find_installed_package, get_client_and_sparse_repodata, load_package_records, HasSpecs,
-};
+use super::common::{find_installed_package, get_client_and_sparse_repodata, load_package_records};
 use super::install::globally_install_package;
 
 /// Upgrade specific package which is installed globally.
@@ -52,14 +51,14 @@ impl HasSpecs for Args {
 pub async fn execute(args: Args) -> miette::Result<()> {
     let config = Config::load_global();
     let specs = args.specs()?;
-    upgrade_packages(specs, config, &args.channel, &args.platform).await
+    upgrade_packages(specs, config, &args.channel, args.platform).await
 }
 
 pub(super) async fn upgrade_packages(
     specs: IndexMap<PackageName, MatchSpec>,
     config: Config,
     cli_channels: &[String],
-    platform: &Platform,
+    platform: Platform,
 ) -> miette::Result<()> {
     let channel_cli = config.compute_channels(cli_channels).into_diagnostic()?;
 
@@ -86,7 +85,7 @@ pub(super) async fn upgrade_packages(
     // Fetch sparse repodata across all channels
     let all_channels = channels.values().chain(channel_cli.iter()).unique();
     let (client, repodata) =
-        get_client_and_sparse_repodata(all_channels, *platform, &config).await?;
+        get_client_and_sparse_repodata(all_channels, platform, &config).await?;
 
     // Resolve environments in parallel
     let mut set: JoinSet<Result<_, Report>> = JoinSet::new();
