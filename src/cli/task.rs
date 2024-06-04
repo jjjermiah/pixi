@@ -85,6 +85,10 @@ pub struct AddArgs {
     /// Isolate the task from the shell environment, and only use the pixi environment to run the task
     #[arg(long)]
     pub clean_env: bool,
+    
+    /// A description of the task to be added
+    #[arg(long)]
+    pub description: Option<String>,
 }
 
 /// Parse a single key-value pair
@@ -150,7 +154,11 @@ impl From<AddArgs> for Task {
         // complex, or alias command.
         if cmd_args.trim().is_empty() && !depends_on.is_empty() {
             Self::Alias(Alias { depends_on })
-        } else if depends_on.is_empty() && value.cwd.is_none() && value.env.is_empty() {
+        } else if depends_on.is_empty()
+            && value.cwd.is_none()
+            && value.env.is_empty()
+            && value.description.is_none()
+        {
             Self::Plain(cmd_args)
         } else {
             let clean_env = value.clean_env;
@@ -164,6 +172,10 @@ impl From<AddArgs> for Task {
                 }
                 Some(env)
             };
+
+            // if no description is provided, keep it empty string
+            let description = value.description.map(|desc| desc.to_string());
+
             Self::Execute(Execute {
                 cmd: CmdArgs::Single(cmd_args),
                 depends_on,
@@ -172,6 +184,7 @@ impl From<AddArgs> for Task {
                 cwd,
                 env,
                 clean_env,
+                description,
             })
         }
     }
