@@ -19,6 +19,7 @@ test-all = "cargo test --all-features"
 lint = "pre-commit run --all"
 bump = "tbump --only-patch"
 pypi-proxy = "python ./tests/pypi_proxy.py"
+publish-pypi = { cmd = "hatch publish --yes --repo main", env = { HATCH_CONFIG = "config/hatch.toml" }, description = "Publish the package to pypi" }
 
 [feature.dev.dependencies]
 pre-commit = "~=3.3.0"

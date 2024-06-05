@@ -415,6 +415,9 @@ impl From<Task> for Item {
                 if let Some(env) = process.env {
                     table.insert("env", Value::InlineTable(env.into_iter().collect()));
                 }
+                if let Some(description) = process.description {
+                    table.insert("description", description.into());
+                }
                 Item::Value(Value::InlineTable(table))
             }
             Task::Alias(alias) => {
