@@ -293,6 +293,19 @@ impl Feature {
     pub fn pypi_options(&self) -> Option<&PypiOptions> {
         self.pypi_options.as_ref()
     }
+
+    pub fn tasks(&self) -> IndexMap<TaskName, Task> {
+        let mut task_map = IndexMap::new();
+
+        // iterate through self.targets and collect all
+        for target in self.targets.targets() {
+            for (task_name, task) in target.tasks.iter() {
+                task_map.insert(task_name.clone(), task.clone());
+            }
+        }
+
+       task_map 
+    }
 }
 
 impl<'de> Deserialize<'de> for Feature {

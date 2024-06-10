@@ -23,7 +23,8 @@ build-backend = "hatchling.build"
 #__________________________________________________________________________________________________#
 [tool.pixi.project]
 channels = ["conda-forge", "bioconda"]
-platforms = ["osx-arm64", "linux-64", "win-64", "osx-64"]
+platforms = ["osx-arm64"]
+# platforms = ["osx-arm64", "linux-64", "win-64", "osx-64"]
 
 [tool.pixi.dependencies]
 pandas = ">=2.2.2,<2.3"
@@ -38,10 +39,25 @@ dev = { features = [
   "docs",
   "verify",
 ], solve-group = "default" }
-publish = { features = ["build", "release"], solve-group = "default" }
+publish = { features = [
+  "pkgbuild",
+  "release",
+], solve-group = "default" }
+py310 = ["py310", "test"]
+py311 = ["py311", "test"]
+py312 = ["py312", "test"]
 
 [tool.pixi.tasks]
 hello = ' echo "Hello World!" '
+
+############################################## python ###############################################
+
+[tool.pixi.feature.py310.dependencies]
+python = "3.10.*"
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
 
 ############################################## TEST ################################################
 [tool.pixi.feature.test.dependencies]
@@ -60,6 +76,7 @@ cmd = [
 ]
 inputs = ["src", "tests"]
 outputs = ["coverage-report/coverage.xml"]
+description = "Runs pytest with coverage"
 
 ############################################## STYLE ###############################################
 # See ruff.toml for the configuration
@@ -75,18 +92,21 @@ style = { cmd = "ruff check src", inputs = ["src"] }
 [tool.pixi.feature.docs.dependencies]
 mkdocs = "*"
 
-[tool.pixi.feature.docs.tasks.doc-build]
-cmd = "mkdocs build -f mkdocs.yaml"
+[tool.pixi.feature.docs.tasks.build]
+cmd = "echo 'mkdocs build -f mkdocs.yaml'"
 inputs = ["docs"]
 outputs = ["site"]
+description = "Builds the documentation"
 
-[tool.pixi.feature.docs.tasks.doc-serve]
-cmd = "mkdocs serve -f mkdocs.yaml"
+[tool.pixi.feature.docs.tasks.serve]
+cmd = "echo 'mkdocs serve -f mkdocs.yaml'"
 inputs = ["docs"]
+description = "Serves the documentation on localhost"
 
-[tool.pixi.feature.docs.tasks.doc-deploy]
-cmd = "mkdocs gh-deploy -f mkdocs.yaml --force"
+[tool.pixi.feature.docs.tasks.deploy]
+cmd = "echo 'mkdocs gh-deploy -f mkdocs.yaml --force'"
 inputs = ["docs"]
+description = "Deploys the documentation to GitHub Pages"
 
 ############################################## VERIFY #############################################
 [tool.pixi.feature.verify.dependencies]
@@ -97,32 +117,36 @@ mypy = ">=1.10.0,<1.11"
 [tool.pixi.feature.verify.tasks]
 verify = { cmd = "pre-commit run --all-files", inputs = ["src", "tests"] }
 
-#################################### RELEASE & BUILD ###############################################
+#################################### RELEASE, BUILD, DOCKER #######################################
 [tool.pixi.feature.release.dependencies]
 python-semantic-release = ">=8.5.1"
 
 [tool.pixi.feature.release.tasks]
 # Semver task will only work on the main or dev/develop branch (see releaserc.toml:branches)
 semver = 'echo "Next Version is: $(semantic-release -c releaserc.toml version --print)"'
-release = "semantic-release -c releaserc.toml version"
+deploy = { cmd = "semantic-release -c releaserc.toml version", description = "Deploys a release to GitHub" }
 
-[tool.pixi.feature.build.dependencies]
+[tool.pixi.feature.pkgbuild.dependencies]
 hatch = "*"
 
-[tool.pixi.feature.build.tasks]
+[tool.pixi.feature.pkgbuild.tasks]
 # Builds the package and publishes it to the test.pypi.org repository
-build = { cmd = "hatch build --clean", inputs = ["src"], outputs = ["dist/*"] }
+build = { cmd = "echo 'hatch build --clean'", inputs = [
+  "src",
+], outputs = [
+  "dist/*",
+], description = "Builds the package using hatch" }
 
-publish-pypi = { cmd = "hatch publish --yes --repo main", inputs = [
+publish-pypi = { cmd = "echo 'hatch publish --yes --repo main'", inputs = [
   "dist/*",
   "hatch.toml",
 ], depends-on = [
   "build",
-], description = "Publishes the package to the main PyPI repository"}
+], description = "Publishes the package to the main PyPI repository" }
 
-publish-test = { cmd = "hatch publish --yes --repo test", inputs = [
+publish-test = { cmd = "echo 'hatch publish --yes --repo test'", inputs = [
   "dist/*",
   "hatch.toml",
 ], depends-on = [
   "build",
-], description = "Publishes the package to the test.pypi.org repository"}
+], description = "Publishes the package to the test.pypi.org repository" }

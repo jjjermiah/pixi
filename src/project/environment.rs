@@ -163,6 +163,13 @@ impl<'p> Environment<'p> {
         Ok(result)
     }
 
+    /// Returns a hashmap of FeatureName to Vec<TaskName> for all tasks available for the given environment
+    pub fn feature_tasks(&self) -> HashMap<FeatureName, indexmap::IndexMap<TaskName, Task>> {
+        self.features()
+            .map(|feature| (feature.name.clone(), feature.tasks()))
+            .collect()
+    }
+
     /// Return all tasks available for the given environment
     /// This will not return task prefixed with _
     pub fn get_filtered_tasks(&self) -> HashSet<TaskName> {
