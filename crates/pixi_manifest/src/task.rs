@@ -38,6 +38,17 @@ impl From<TaskName> for String {
         task_name.0 // Assuming TaskName is a tuple struct with the first element as String
     }
 }
+/// Refined struct with more professional types and efficient field handling.
+#[derive(Serialize)]
+pub struct TaskInfo<'a> {
+    cmd: Cow<'a, str>,
+    depends_on: &'a [TaskName],
+    description: Option<Cow<'a, str>>,
+    cwd: Option<Cow<'a, str>>,
+    env: Option<&'a IndexMap<String, String>>,
+    clean_env: bool,
+}
+
 
 /// Represents different types of scripts
 #[derive(Debug, Clone, Deserialize)]
@@ -53,6 +64,18 @@ pub enum Task {
 }
 
 impl Task {
+    /// Creates a `TaskInfo` instance from the current `Task` instance.
+    pub fn to_info(&self) -> TaskInfo {
+        TaskInfo {
+            cmd: self.as_single_command().unwrap_or(Cow::Borrowed("")),
+            depends_on: self.depends_on(),
+            description: self.description().map(Cow::Borrowed),
+            cwd: self.working_directory().map(|p| Cow::Owned(p.display().to_string())),
+            env: self.env(),
+            clean_env: self.clean_env(),
+        }
+    }
+
     /// Returns the names of the task that this task depends on
     pub fn depends_on(&self) -> &[TaskName] {
         match self {

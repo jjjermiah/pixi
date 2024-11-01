@@ -6,7 +6,7 @@ use clap::Parser;
 use fancy_display::FancyDisplay;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use pixi_manifest::task::{quote, Alias, CmdArgs, Execute, Task, TaskName};
+use pixi_manifest::task::{quote, Alias, CmdArgs, Execute, Task, TaskInfo, TaskName};
 use pixi_manifest::EnvironmentName;
 use pixi_manifest::FeatureName;
 use rattler_conda_types::Platform;
@@ -135,6 +135,11 @@ pub struct ListArgs {
     /// If not specified, the default environment is used.
     #[arg(long, short)]
     pub environment: Option<String>,
+
+    /// List as json instead of a tree
+    /// If not specified, the default environment is used.
+    #[arg(long, short)]
+    pub json: bool,
 }
 
 impl From<AddArgs> for Task {
@@ -432,10 +437,55 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 })
                 .collect();
 
+            if args.json {
+                json_tasks(&tasks_per_env);
+                return Ok(());
+            }
+
             list_tasks(tasks_per_env, args.summary).expect("io error when printing tasks");
         }
     };
 
     Project::warn_on_discovered_from_env(args.project_config.manifest_path.as_deref());
     Ok(())
+}
+
+#[derive(serde::Serialize)]
+struct SerializableTask<'a> {
+    name: &'a str,
+    #[serde(flatten)]
+    info: TaskInfo<'a>,
+}
+
+#[derive(serde::Serialize)]
+struct SerializableEnvironment<'a> {
+    environment: &'a str,
+    tasks: Vec<SerializableTask<'a>>,
+}
+
+fn json_tasks(tasks_per_env: &HashMap<Environment, HashMap<TaskName, Task>>) {
+    // Convert tasks_per_env into a vector of SerializableEnvironment structs.
+    let serializable_envs: Vec<SerializableEnvironment> = tasks_per_env
+        .iter()
+        .map(|(environment, env_tasks)| {
+            let tasks: Vec<SerializableTask> = env_tasks
+                .iter()
+                .map(|(task_name, task)| SerializableTask {
+                    name: task_name.as_str(),
+                    info: task.to_info(),
+                })
+                .collect();
+
+            SerializableEnvironment {
+                environment: environment.name().as_str(),
+                tasks,
+            }
+        })
+        .collect();
+
+    // Serialize the structured data to JSON with pretty printing.
+    let json_string =
+        serde_json::to_string_pretty(&serializable_envs).expect("Failed to serialize tasks");
+
+    println!("{}", json_string);
 }
