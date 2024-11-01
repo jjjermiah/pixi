@@ -83,6 +83,9 @@ pub struct Args {
     /// Whether the pypi requirement should be editable
     #[arg(long, requires = "pypi")]
     pub editable: bool,
+
+    #[arg(long, hide = true)]
+    markdown_help: bool,
 }
 
 pub async fn execute(args: Args) -> miette::Result<()> {
@@ -102,7 +105,11 @@ pub async fn execute(args: Args) -> miette::Result<()> {
     project
         .manifest
         .add_platforms(dependency_config.platform.iter(), &FeatureName::Default)?;
-
+    // Invoked as: `$ my-app --markdown-help`
+    if args.markdown_help {
+        clap_markdown::print_help_markdown::<Args>();
+        return Ok(());
+    }
     // Add the individual specs to the project.
     let mut conda_specs_to_add_constraints_for = IndexMap::new();
     let mut pypi_specs_to_add_constraints_for = IndexMap::new();

@@ -277,6 +277,7 @@ uv-resolver = { workspace = true }
 uv-types = { workspace = true }
 xxhash-rust = { workspace = true }
 zip = { workspace = true, features = ["deflate", "time"] }
+clap-markdown = "0.1.4"
 
 
 [target.'cfg(unix)'.dependencies]

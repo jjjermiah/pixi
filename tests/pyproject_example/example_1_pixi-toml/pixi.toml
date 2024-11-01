@@ -1,0 +1,15 @@
+[project]
+authors = ["Jermiah Joseph <jermiahjoseph98@gmail.com>"]
+channels = ["conda-forge"]
+description = "Add a short description here"
+name = "example_1_pixi-toml"
+platforms = ["osx-arm64", "osx-64", "win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.12.6,<4"
+
+[target.win-64.pypi-dependencies]
+assertwt = ">=2.3.1, <3"
