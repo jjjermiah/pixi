@@ -38,7 +38,7 @@ impl From<TaskName> for String {
         task_name.0 // Assuming TaskName is a tuple struct with the first element as String
     }
 }
-/// Refined struct with more professional types and efficient field handling.
+/// Collection of task properties for displaying in the UI.
 #[derive(Serialize)]
 pub struct TaskInfo<'a> {
     cmd: Cow<'a, str>,
