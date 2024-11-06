@@ -47,8 +47,9 @@ pub struct TaskInfo<'a> {
     cwd: Option<Cow<'a, str>>,
     env: Option<&'a IndexMap<String, String>>,
     clean_env: bool,
+    inputs: Option<&'a [String]>,
+    outputs: Option<&'a [String]>,
 }
-
 
 /// Represents different types of scripts
 #[derive(Debug, Clone, Deserialize)]
@@ -70,9 +71,13 @@ impl Task {
             cmd: self.as_single_command().unwrap_or(Cow::Borrowed("")),
             depends_on: self.depends_on(),
             description: self.description().map(Cow::Borrowed),
-            cwd: self.working_directory().map(|p| Cow::Owned(p.display().to_string())),
+            cwd: self
+                .working_directory()
+                .map(|p| Cow::Owned(p.display().to_string())),
             env: self.env(),
             clean_env: self.clean_env(),
+            inputs: self.inputs().map(|v| v.as_slice()),
+            outputs: self.outputs().map(|v| v.as_slice()),
         }
     }
 
@@ -179,6 +184,22 @@ impl Task {
             Task::Custom(_) => false,
             Task::Execute(execute) => execute.clean_env,
             Task::Alias(_) => false,
+        }
+    }
+
+    /// Returns the inputs of the task.
+    pub fn inputs(&self) -> Option<&Vec<String>> {
+        match self {
+            Task::Execute(exe) => exe.inputs.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Returns the outputs of the task.
+    pub fn outputs(&self) -> Option<&Vec<String>> {
+        match self {
+            Task::Execute(exe) => exe.outputs.as_ref(),
+            _ => None,
         }
     }
 }
