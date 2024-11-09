@@ -10,6 +10,9 @@ use pixi_manifest::task::{quote, Alias, CmdArgs, Execute, Task, TaskName};
 use pixi_manifest::EnvironmentName;
 use pixi_manifest::FeatureName;
 use rattler_conda_types::Platform;
+use serde::Serialize;
+use serde_with::serde_as;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
@@ -135,6 +138,11 @@ pub struct ListArgs {
     /// If not specified, the default environment is used.
     #[arg(long, short)]
     pub environment: Option<String>,
+
+    /// List as json instead of a tree
+    /// If not specified, the default environment is used.
+    #[arg(long, short)]
+    pub json: bool,
 }
 
 impl From<AddArgs> for Task {
@@ -432,10 +440,90 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 })
                 .collect();
 
+            if args.json {
+                json_tasks(&tasks_per_env);
+                return Ok(());
+            }
+
             list_tasks(tasks_per_env, args.summary).expect("io error when printing tasks");
         }
     };
 
     Project::warn_on_discovered_from_env(args.project_config.manifest_path.as_deref());
     Ok(())
+}
+
+/// Collection of task properties for displaying in the UI.
+#[serde_as]
+#[derive(Serialize)]
+pub struct TaskInfo {
+    cmd: String,
+    description: Option<String>,
+    depends_on: Vec<TaskName>,
+    cwd: Option<PathBuf>,
+    env: Option<IndexMap<String, String>>,
+    clean_env: bool,
+    inputs: Option<Vec<String>>,
+    outputs: Option<Vec<String>>,
+}
+
+impl From<&Task> for TaskInfo {
+    fn from(task: &Task) -> Self {
+        TaskInfo {
+            cmd: task
+                .as_single_command()
+                .unwrap_or_else(|| Cow::Borrowed(""))
+                .to_string(),
+            description: task.description().map(|desc| desc.to_string()),
+            depends_on: task.depends_on().to_vec(),
+            cwd: task.working_directory().map(PathBuf::from),
+            env: task.env().map(|env| env.clone()),
+            clean_env: task.clean_env(),
+            inputs: task
+                .inputs()
+                .map(|inputs| inputs.iter().map(String::from).collect()),
+            outputs: task
+                .outputs()
+                .map(|outputs| outputs.iter().map(String::from).collect()),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SerializableTask {
+    name: String,
+    #[serde(flatten)]
+    info: TaskInfo,
+}
+
+#[derive(Serialize)]
+struct EnvTasks {
+    environment: String,
+    tasks: Vec<SerializableTask>,
+}
+
+fn json_tasks(tasks_per_env: &HashMap<Environment, HashMap<TaskName, Task>>) {
+    // Convert tasks_per_env into a Vec of EnvTasks.
+    let env_tasks_list: Vec<EnvTasks> = tasks_per_env
+        .iter()
+        .map(|(environment, env_tasks)| {
+            let tasks: Vec<SerializableTask> = env_tasks
+                .iter()
+                .map(|(task_name, task)| SerializableTask {
+                    name: task_name.as_str().to_string(),
+                    info: TaskInfo::from(task),
+                })
+                .collect();
+            EnvTasks {
+                environment: environment.name().as_str().to_string(),
+                tasks,
+            }
+        })
+        .collect();
+
+    // Serialize the structured data to JSON with pretty printing.
+    let json_string =
+        serde_json::to_string_pretty(&env_tasks_list).expect("Failed to serialize tasks");
+
+    println!("{}", json_string);
 }
