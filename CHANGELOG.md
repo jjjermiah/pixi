@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### [0.37.0] - 2024-11-18
+#### ✨ Highlights
+
+We now allow the use of `prefix.dev` channels with sharded repodata:
+
+Running `pixi search rubin-env` using `hyperfine` on the default versus our channels gives these results:
+
+| Cache Status | Channel                                  | Mean [ms] | Relative |
+|:-------------|------------------------------------------|----------:|---------:|
+| With cache   | `https://prefix.dev/conda-forge`         |      69.3 |     1.00 |
+| Without      | `https://prefix.dev/conda-forge`         |     389.5 |     5.62 |
+| With cache   | `https://conda.anaconda.org/conda-forge` |    1043.3 |    15.06 |
+| Without      | `https://conda.anaconda.org/conda-forge` |    2420.3 |    34.94 |
+
+#### Breaking
+
+- Make sure that `[activation.env]` are not completely overridden by `[target.` tables, by @hameerabbasi in [#2396](https://github.com/prefix-dev/pixi/pull/2396)
+
+#### Changed
+
+- Allow using sharded repodata by @baszalmstra in [#2467](https://github.com/prefix-dev/pixi/pull/2467)
+
+#### Documentation
+
+- Update ros2.md turtlesim section by @nbbrooks in [#2442](https://github.com/prefix-dev/pixi/pull/2442)
+- Update pycharm.md to show optional installation by @plainerman in [#2487](https://github.com/prefix-dev/pixi/pull/2487)
+- Fix typo in documentation by @saraedum in [#2496](https://github.com/prefix-dev/pixi/pull/2496)
+- Update pixi install output by @LiamConnors in [#2495](https://github.com/prefix-dev/pixi/pull/2495)
+
+#### Fixed
+
+- Incorrect python version was used in some parts of the solve by @tdejager in [#2481](https://github.com/prefix-dev/pixi/pull/2481)
+- Wrong description on pixi upgrade by @notPlancha in [#2483](https://github.com/prefix-dev/pixi/pull/2483)
+- Extra test for mismatch in python versions by @tdejager in [#2485](https://github.com/prefix-dev/pixi/pull/2485)
+- Keep `build` in `pixi upgrade` by @ruben-arts in [#2476](https://github.com/prefix-dev/pixi/pull/2476)
+
+#### New Contributors
+* @saraedum made their first contribution in [#2496](https://github.com/prefix-dev/pixi/pull/2496)
+* @plainerman made their first contribution in [#2487](https://github.com/prefix-dev/pixi/pull/2487)
+* @hameerabbasi made their first contribution in [#2396](https://github.com/prefix-dev/pixi/pull/2396)
+* @nbbrooks made their first contribution in [#2442](https://github.com/prefix-dev/pixi/pull/2442)
+
+### [0.36.0] - 2024-11-07
+#### ✨ Highlights
+
+- You can now `pixi upgrade` your project dependencies.
+- We've done a performance improvement on the prefix validation check, thus faster `pixi run` startup times.
+
+#### Added
+
+- Add powerpc64le target to trampoline by @ruben-arts in [#2419](https://github.com/prefix-dev/pixi/pull/2419)
+- Add trampoline tests again by @Hofer-Julian in [#2420](https://github.com/prefix-dev/pixi/pull/2420)
+- Add `pixi upgrade` by @Hofer-Julian in [#2368](https://github.com/prefix-dev/pixi/pull/2368)
+- Add platform fallback win-64 for win-arm64 by @chawyehsu in [#2427](https://github.com/prefix-dev/pixi/pull/2427)
+- Add `--prepend` option for `pixi project channel add` by @mrswastik-robot in [#2447](https://github.com/prefix-dev/pixi/pull/2447)
+
+#### Documentation
+
+- Fix cli basic usage example by @lucascolley in [#2432](https://github.com/prefix-dev/pixi/pull/2432)
+- Update python tutorial by @LiamConnors in [#2452](https://github.com/prefix-dev/pixi/pull/2452)
+- Improve `pixi global` docs by @Hofer-Julian in [#2437](https://github.com/prefix-dev/pixi/pull/2437)
+
+#### Fixed
+
+- Use `--silent` instead of `--no-progress-meter` for old `curl` by @jaimergp in [#2428](https://github.com/prefix-dev/pixi/pull/2428)
+- Search should return latest package across all platforms by @nichmor in [#2424](https://github.com/prefix-dev/pixi/pull/2424)
+- Trampoline unwraps by @ruben-arts in [#2422](https://github.com/prefix-dev/pixi/pull/2422)
+- PyPI Index usage (regression in v0.35.0) by @tdejager in [#2465](https://github.com/prefix-dev/pixi/pull/2465)
+- PyPI git dependencies (regression in v0.35.0) by @wolfv in [#2438](https://github.com/prefix-dev/pixi/pull/2438)
+- Tolerate pixi file errors (regression in v0.35.0) by @jvenant in [#2457](https://github.com/prefix-dev/pixi/pull/2457)
+- Make sure tasks are fetched for best platform by @jjjermiah in [#2446](https://github.com/prefix-dev/pixi/pull/2446)
+
+#### Performance
+
+- Quick prefix validation check by @ruben-arts in [#2400](https://github.com/prefix-dev/pixi/pull/2400)
+
+#### New Contributors
+* @jvenant made their first contribution in [#2457](https://github.com/prefix-dev/pixi/pull/2457)
+* @mrswastik-robot made their first contribution in [#2447](https://github.com/prefix-dev/pixi/pull/2447)
+* @LiamConnors made their first contribution in [#2452](https://github.com/prefix-dev/pixi/pull/2452)
+
+
 ### [0.35.0] - 2024-11-05
 #### ✨ Highlights
 

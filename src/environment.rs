@@ -34,6 +34,7 @@ use std::{
 use tokio::sync::Semaphore;
 use uv_distribution_types::{InstalledDist, Name};
 
+use crate::lock_file::LockFileDerivedData;
 use xxhash_rust::xxh3::Xxh3;
 
 /// Verify the location of the prefix folder is not changed so the applied
@@ -233,15 +234,27 @@ pub(crate) fn write_environment_file(
         .parent()
         .expect("There should already be a conda-meta folder");
 
-    std::fs::create_dir_all(parent).into_diagnostic()?;
-
-    // Using json as it's easier to machine read it.
-    let contents = serde_json::to_string_pretty(&env_file).into_diagnostic()?;
-    std::fs::write(&path, contents).into_diagnostic()?;
-
-    tracing::debug!("Wrote environment file to: {:?}", path);
-
-    Ok(path)
+    match std::fs::create_dir_all(parent).into_diagnostic() {
+        Ok(_) => {
+            // Using json as it's easier to machine read it.
+            let contents = serde_json::to_string_pretty(&env_file).into_diagnostic()?;
+            match std::fs::write(&path, contents).into_diagnostic() {
+                Ok(_) => {
+                    tracing::debug!("Wrote environment file to: {:?}", path);
+                }
+                Err(e) => tracing::debug!(
+                    "Unable to write environment file to: {:?} => {:?}",
+                    path,
+                    e.root_cause().to_string()
+                ),
+            };
+            Ok(path)
+        }
+        Err(e) => {
+            tracing::debug!("Unable to create conda-meta folder to: {:?}", path);
+            Err(e)
+        }
+    }
 }
 
 /// Reading the environment file of the environment.
@@ -376,12 +389,12 @@ impl LockFileUsage {
 /// takes up a lot of memory and takes a while to load. If `sparse_repo_data` is
 /// `None` it will be downloaded. If the lock-file is not updated, the
 /// `sparse_repo_data` is ignored.
-pub async fn update_prefix(
-    environment: &Environment<'_>,
+pub async fn get_update_lock_file_and_prefix<'env>(
+    environment: &Environment<'env>,
     lock_file_usage: LockFileUsage,
     mut no_install: bool,
     update_mode: UpdateMode,
-) -> miette::Result<()> {
+) -> miette::Result<(LockFileDerivedData<'env>, Prefix)> {
     let current_platform = environment.best_platform();
     let project = environment.project();
 
@@ -403,11 +416,14 @@ pub async fn update_prefix(
         })
         .await?;
 
-    // Get the locked environment from the lock-file.
-    if !no_install {
-        lock_file.prefix(environment, update_mode).await?;
-    }
-    Ok(())
+    // Get the prefix from the lock-file.
+    let prefix = if no_install {
+        Prefix::new(environment.dir())
+    } else {
+        lock_file.prefix(environment, update_mode).await?
+    };
+
+    Ok((lock_file, prefix))
 }
 
 #[allow(clippy::too_many_arguments)]

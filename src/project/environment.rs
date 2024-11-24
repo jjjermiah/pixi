@@ -98,6 +98,19 @@ impl<'p> Environment<'p> {
             .join(self.environment.name.as_str())
     }
 
+    /// We store a hash of the lockfile and all activation env variables in a file
+    /// in the cache. The current name is `activation_environment-name.json`.
+    pub(crate) fn activation_cache_name(&self) -> String {
+        format!("activation_{}.json", self.name())
+    }
+
+    /// Returns the activation cache file path.
+    pub(crate) fn activation_cache_file_path(&self) -> std::path::PathBuf {
+        self.project
+            .activation_env_cache_folder()
+            .join(self.activation_cache_name())
+    }
+
     /// Returns the best platform for the current platform & environment.
     pub fn best_platform(&self) -> Platform {
         let current = Platform::current();
@@ -261,7 +274,7 @@ impl<'p> Environment<'p> {
     /// are defined for the environment.
     pub(crate) fn activation_env(&self, platform: Option<Platform>) -> IndexMap<String, String> {
         self.features()
-            .filter_map(|f| f.activation_env(platform))
+            .map(|f| f.activation_env(platform))
             .fold(IndexMap::new(), |mut acc, env| {
                 acc.extend(env.iter().map(|(k, v)| (k.clone(), v.clone())));
                 acc
@@ -329,6 +342,7 @@ impl<'p> Hash for Environment<'p> {
 mod tests {
     use std::{collections::HashSet, path::Path};
 
+    use indexmap::indexmap;
     use insta::assert_snapshot;
     use itertools::Itertools;
     use pixi_manifest::CondaDependencies;
@@ -493,23 +507,23 @@ mod tests {
         let manifest = Project::from_str(
             Path::new("pixi.toml"),
             r#"
-        [project]
-        name = "foobar"
-        channels = []
-        platforms = ["linux-64", "osx-64"]
+            [project]
+            name = "foobar"
+            channels = []
+            platforms = ["linux-64", "osx-64"]
 
-        [activation]
-        scripts = ["default.bat"]
+            [activation]
+            scripts = ["default.bat"]
 
-        [target.linux-64.activation]
-        scripts = ["linux.bat"]
+            [target.linux-64.activation]
+            scripts = ["linux.bat"]
 
-        [feature.foo.activation]
-        scripts = ["foo.bat"]
+            [feature.foo.activation]
+            scripts = ["foo.bat"]
 
-        [environments]
-        foo = ["foo"]
-                "#,
+            [environments]
+            foo = ["foo"]
+            "#,
         )
         .unwrap();
 
@@ -521,6 +535,49 @@ mod tests {
         assert_eq!(
             foo_env.activation_scripts(Some(Platform::Linux64)),
             vec!["foo.bat".to_string(), "linux.bat".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_activation_env() {
+        let manifest = Project::from_str(
+            Path::new("pixi.toml"),
+            r#"
+            [project]
+            name = "foobar"
+            channels = []
+            platforms = ["linux-64", "osx-64"]
+
+            [activation.env]
+            DEFAULT_VAR = "1"
+
+            [target.linux-64.activation.env]
+            LINUX_VAR = "1"
+
+            [feature.foo.activation.env]
+            FOO_VAR = "1"
+
+            [environments]
+            foo = ["foo"]
+            "#,
+        )
+        .unwrap();
+
+        let default_env = manifest.default_environment();
+        let foo_env = manifest.environment("foo").unwrap();
+        assert_eq!(
+            foo_env.activation_env(None),
+            indexmap! {
+                "FOO_VAR".to_string() => "1".to_string(),
+                "DEFAULT_VAR".to_string() => "1".to_string(),
+            }
+        );
+        assert_eq!(
+            default_env.activation_env(Some(Platform::Linux64)),
+            indexmap! {
+                "LINUX_VAR".to_string() => "1".to_string(),
+                "DEFAULT_VAR".to_string() => "1".to_string(),
+            }
         );
     }
 
