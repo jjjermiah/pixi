@@ -12,7 +12,6 @@ use pixi_manifest::FeatureName;
 use rattler_conda_types::Platform;
 use serde::Serialize;
 use serde_with::serde_as;
-use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
@@ -141,7 +140,7 @@ pub struct ListArgs {
 
     /// List as json instead of a tree
     /// If not specified, the default environment is used.
-    #[arg(long, short)]
+    #[arg(long)]
     pub json: bool,
 }
 
@@ -226,7 +225,7 @@ pub struct Args {
 
 fn print_heading(value: &str) {
     let bold = console::Style::new().bold();
-    eprintln!("{}\n{:-<2$}", bold.apply_to(value), "", value.len(),);
+    eprintln!("{}\n{:-<2$}", bold.apply_to(value), "", value.len());
 }
 
 fn list_tasks(
@@ -292,7 +291,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 "{}Added task `{}`: {}",
                 console::style(console::Emoji("✔ ", "+")).green(),
                 name.fancy_display().bold(),
-                task,
+                task
             );
         }
         Operation::Remove(args) => {
@@ -311,7 +310,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                             "{}Task '{}' does not exist on {}",
                             console::style(console::Emoji("❌ ", "X")).red(),
                             name.fancy_display().bold(),
-                            console::style(platform.as_str()).bold(),
+                            console::style(platform.as_str()).bold()
                         );
                         continue;
                     }
@@ -320,7 +319,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         "{}Task `{}` does not exist for the `{}` feature",
                         console::style(console::Emoji("❌ ", "X")).red(),
                         name.fancy_display().bold(),
-                        console::style(&feature).bold(),
+                        console::style(&feature).bold()
                     );
                     continue;
                 }
@@ -354,7 +353,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 eprintln!(
                     "{}Removed task `{}` ",
                     console::style(console::Emoji("✔ ", "+")).green(),
-                    name.fancy_display().bold(),
+                    name.fancy_display().bold()
                 );
             }
         }
@@ -372,7 +371,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 "{} Added alias `{}`: {}",
                 console::style("@").blue(),
                 name.fancy_display().bold(),
-                task,
+                task
             );
         }
         Operation::List(args) => {
@@ -386,6 +385,11 @@ pub fn execute(args: Args) -> miette::Result<()> {
                         .ok_or_else(|| miette::miette!("unknown environment '{n}'"))
                 })
                 .transpose()?;
+
+            if args.json {
+                print_tasks_json(&project);
+                return Ok(());
+            }
 
             let env_task_map: HashMap<Environment, HashSet<TaskName>> =
                 if let Some(explicit_environment) = explicit_environment {
@@ -411,7 +415,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 env_task_map.values().flatten().cloned().collect();
 
             if available_tasks.is_empty() {
-                eprintln!("No tasks found",);
+                eprintln!("No tasks found");
                 return Ok(());
             }
 
@@ -425,7 +429,7 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 return Ok(());
             }
 
-            let tasks_per_env = env_task_map
+            let tasks_per_env: HashMap<Environment, HashMap<TaskName, Task>> = env_task_map
                 .into_iter()
                 .map(|(env, task_names)| {
                     let tasks: HashMap<TaskName, Task> = task_names
@@ -440,24 +444,90 @@ pub fn execute(args: Args) -> miette::Result<()> {
                 })
                 .collect();
 
-            if args.json {
-                json_tasks(&tasks_per_env);
-                return Ok(());
-            }
-
             list_tasks(tasks_per_env, args.summary).expect("io error when printing tasks");
         }
-    };
+    }
 
     Project::warn_on_discovered_from_env(args.project_config.manifest_path.as_deref());
     Ok(())
 }
 
+fn build_env_feature_task_map(project: &Project) -> Vec<EnvTasks> {
+    project
+        .environments()
+        .iter()
+        .sorted_by_key(|env| env.name().to_string())
+        .filter_map(|env: &Environment<'_>| {
+            if verify_current_platform_has_required_virtual_packages(env).is_err() {
+                return None;
+            }
+            Some(EnvTasks::from(env))
+        })
+        .collect()
+}
+
+fn print_tasks_json(project: &Project) {
+    let env_feature_task_map: Vec<EnvTasks> = build_env_feature_task_map(project);
+
+    let json_string =
+        serde_json::to_string_pretty(&env_feature_task_map).expect("Failed to serialize tasks");
+    println!("{}", json_string);
+}
+
+#[derive(Serialize, Debug)]
+struct EnvTasks {
+    environment: String,
+    features: Vec<SerializableFeature>,
+}
+
+impl From<&Environment<'_>> for EnvTasks {
+    fn from(env: &Environment) -> Self {
+        Self {
+            environment: env.name().to_string(),
+            features: env
+                .feature_tasks()
+                .iter()
+                .map(|(feature_name, task_map)| {
+                    SerializableFeature::from((*feature_name, task_map))
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+struct SerializableFeature {
+    name: String,
+    tasks: Vec<SerializableTask>,
+}
+
+#[derive(Serialize, Debug)]
+struct SerializableTask {
+    name: String,
+    #[serde(flatten)]
+    info: TaskInfo,
+}
+
+impl From<(&FeatureName, &HashMap<&TaskName, &Task>)> for SerializableFeature {
+    fn from((feature_name, task_map): (&FeatureName, &HashMap<&TaskName, &Task>)) -> Self {
+        Self {
+            name: feature_name.to_string(),
+            tasks: task_map
+                .iter()
+                .map(|(task_name, task)| SerializableTask {
+                    name: task_name.to_string(),
+                    info: TaskInfo::from(*task),
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Collection of task properties for displaying in the UI.
 #[serde_as]
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct TaskInfo {
-    cmd: String,
+    cmd: Option<String>,
     description: Option<String>,
     depends_on: Vec<TaskName>,
     cwd: Option<PathBuf>,
@@ -470,10 +540,7 @@ pub struct TaskInfo {
 impl From<&Task> for TaskInfo {
     fn from(task: &Task) -> Self {
         TaskInfo {
-            cmd: task
-                .as_single_command()
-                .unwrap_or_else(|| Cow::Borrowed(""))
-                .to_string(),
+            cmd: task.as_single_command().map(|cmd| cmd.to_string()),
             description: task.description().map(|desc| desc.to_string()),
             depends_on: task.depends_on().to_vec(),
             cwd: task.working_directory().map(PathBuf::from),
@@ -487,43 +554,4 @@ impl From<&Task> for TaskInfo {
                 .map(|outputs| outputs.iter().map(String::from).collect()),
         }
     }
-}
-
-#[derive(Serialize)]
-struct SerializableTask {
-    name: String,
-    #[serde(flatten)]
-    info: TaskInfo,
-}
-
-#[derive(Serialize)]
-struct EnvTasks {
-    environment: String,
-    tasks: Vec<SerializableTask>,
-}
-
-fn json_tasks(tasks_per_env: &HashMap<Environment, HashMap<TaskName, Task>>) {
-    // Convert tasks_per_env into a Vec of EnvTasks.
-    let env_tasks_list: Vec<EnvTasks> = tasks_per_env
-        .iter()
-        .map(|(environment, env_tasks)| {
-            let tasks: Vec<SerializableTask> = env_tasks
-                .iter()
-                .map(|(task_name, task)| SerializableTask {
-                    name: task_name.as_str().to_string(),
-                    info: TaskInfo::from(task),
-                })
-                .collect();
-            EnvTasks {
-                environment: environment.name().as_str().to_string(),
-                tasks,
-            }
-        })
-        .collect();
-
-    // Serialize the structured data to JSON with pretty printing.
-    let json_string =
-        serde_json::to_string_pretty(&env_tasks_list).expect("Failed to serialize tasks");
-
-    println!("{}", json_string);
 }
